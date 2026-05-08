@@ -25,6 +25,7 @@ __author__ = "VMware, Inc."
 import atexit
 import logging
 import os
+import ssl
 from pyVim.connect import SmartConnect, Disconnect
 from .. import VsphereConnectException
 
@@ -45,6 +46,29 @@ def read_session_id(sessionfile):
         logging.exception("Error restoring session")
         return None
 
+
+def get_ssl_context(args):
+    ssl_context = None
+
+    ca_file = os.environ.get("SSL_CA_FILE")
+    ca_path = os.environ.get("SSL_CA_PATH")
+
+    if ca_file or ca_path:
+        ssl_context = ssl.create_default_context()
+        try:
+            ssl_context.load_verify_locations(cafile=ca_file, capath=ca_path)
+        except Exception as e:
+            logging.warning(
+                f"SSL_CA_FILE or SSL_CA_PATH could not be loaded: {e}. "
+                "Falling back to default system truststore."
+            )
+            ssl_context = None
+
+    if args.disable_ssl_verification:
+        ssl_context = ssl._create_unverified_context()
+
+    return ssl_context
+
 def connect(args):
     """
     Determine the most preferred API version supported by the specified server,
@@ -63,9 +87,14 @@ def connect(args):
         "port": args.port,
         "pwd": args.password,
         "user": args.user,
-        "disableSslCertValidation": bool(args.disable_ssl_verification),
         "sessionId": sessionId,
     }
+
+    ssl_context = get_ssl_context(args)
+    if ssl_context:
+        params["sslContext"] = ssl_context
+    else:
+        params["disableSslCertValidation"] = bool(args.disable_ssl_verification)
 
     try:
         try:

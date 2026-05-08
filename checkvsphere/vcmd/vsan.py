@@ -27,6 +27,7 @@ from pyVmomi import vim
 from ..tools import cli, service_instance
 from ..tools.helper import CheckArgument, isallowed, isbanned
 from ..tools.helper import find_entity_views, process_retrieve_content
+from ..tools.service_instance import get_ssl_context
 from monplugin import Check, Status
 
 OK = Status.OK
@@ -179,11 +180,9 @@ def check_objecthealth(check, clusters):
     check.exit(status, message)
 
 def sslContext(args):
-    context = ssl.create_default_context()
-    if args.disable_ssl_verification:
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-
+    context = get_ssl_context(args)
+    if context is None:
+        context = ssl.create_default_context()
     return context
 
 
